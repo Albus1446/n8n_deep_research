@@ -1,0 +1,487 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"{{ $('提取1').item.json.nextSearchTopic }}\",\n  \"topic\": \"general\",\n  \"search_depth\": \"advanced\",\n  \"chunks_per_source\": 3,\n  \"max_results\": 5\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -832,
+        192
+      ],
+      "id": "9d8fce19-ab45-4735-90fe-80d2dbfdf5b0",
+      "name": "Tavily",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "zH72ikg1pZ4GRoL8",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "您是一个深度研究代理，现在是研究初期, 刚遇到用户的问题, 请您先给出初步解答和接下来应该研究的具体方面.\n\n## 输出\n- 必须进一步搜索信息，请务必设置nextSearchTopic\n- 请以**json**格式输出如下例:\n\n{result: str | None\nnextSearchTopic: str | None}",
+          "enableStreaming": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -656,
+        -32
+      ],
+      "id": "88d5bc41-729f-4128-8307-5b8ab77a7902",
+      "name": "初步回答和继续规划"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=「{{ $('对话框输入').item.json.chatInput }}」。\n\n",
+        "options": {
+          "systemMessage": "=您是一个深度研究代理, \n\n根据您的主动研究, 您查询到了\n{{ $json.results }}\n\n您发现了什么？还有哪些问题尚未解答？下一步应该调查哪些具体方面？\n\n\n\n## 输出\n- 请不要输出与已搜索主题完全相同的主题\n- 如果需要进一步搜索信息，请设置nextSearchTopic\n- 如果已获得足够信息，请将shouldContinue设置为false\n- 请以json格式输出, 如下例:\n\n{result: str | None\nnextSearchTopic: str | None\nshouldContinue: bool }"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -656,
+        192
+      ],
+      "id": "dddc6b62-73fc-4de0-bfea-0d3ebef03915",
+      "name": "优化回答和逻辑规划"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -560,
+        736
+      ],
+      "id": "f14d7870-57b0-49fd-9f23-e36de3d0caf3",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 取上一个节点的 output\nlet raw = $input.first().json.output;\n\nif (typeof raw === 'string') {\n  raw = raw.match(/\\{[\\s\\S]*\\}/);\n}\n\n// 解析为对象\nconst data = JSON.parse(raw);\n\n// 提取字段\nconst nextSearchTopic = data.nextSearchTopic;\nconst result = data.result;\n\n// 返回 n8n 需要的格式\nreturn [\n  {\n    json: {\n      nextSearchTopic,\n      result\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        -32
+      ],
+      "id": "58cdbf7f-490c-4006-b18e-6eee31f91ada",
+      "name": "提取1"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $input.first().json.output;\nif (typeof raw === 'string') {\n  raw = raw.match(/\\{[\\s\\S]*\\}/);\n}\nconst data = JSON.parse(raw);\n\nconst result = data.result;\nconst nextSearchTopic = data.nextSearchTopic;\nconst shouldContinue = data.shouldContinue;\nlet prevTime = 0;\ntry {prevTime = $('判断').first().json.time ?? 0} catch (e) {prevTime = 0}\nconst time = prevTime + 1;\nreturn [\n  {\n    json: {\n      result,\n      nextSearchTopic,\n      shouldContinue,\n      time\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        192
+      ],
+      "id": "e5caf103-794b-4204-8f6f-947a23cbe55c",
+      "name": "提取2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 取上一个节点的 output\nlet raw = $input.first().json.output;\n\n// 去掉开头多余的 \"Json\" 字样和空白\nif (typeof raw === 'string') {\n  raw = raw.match(/\\{[\\s\\S]*\\}/);\n}\n\n// 解析为对象\nconst data = JSON.parse(raw);\n\n// 提取字段\nconst result = data.result;\n\n// 返回 n8n 需要的格式\nreturn [\n  {\n    json: {\n      result\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        432
+      ],
+      "id": "a4e013d2-ffce-4676-97ac-e983da7e9c47",
+      "name": "提取3"
+    },
+    {
+      "parameters": {
+        "content": "## 研究初期\n**明问题, 定方向, 而后作**",
+        "height": 208,
+        "width": 1088,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1088,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "3aaba0bb-df9b-4af3-843f-3121b202bc9b",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## 研究后期\n总结, 完整回答",
+        "height": 256,
+        "width": 672,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -672,
+        352
+      ],
+      "typeVersion": 1,
+      "id": "4b5a8329-b71f-4fe3-bbc0-e0841620bf2a",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## 研究中期\n**广检索而后优化, 判断决定循环**",
+        "height": 480,
+        "width": 400
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1088,
+        128
+      ],
+      "typeVersion": 1,
+      "id": "3291f65e-40e5-4af0-9e71-94594292799a",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 208,
+        "width": 1088
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1088,
+        128
+      ],
+      "typeVersion": 1,
+      "id": "dcdc6ed3-522d-432a-932a-12456ccf9bef",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Model\n**DeepSeek AI节点 Credential to connect with >> Create new credential >> API-key 输入个人API即可**",
+        "height": 256,
+        "width": 512,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1088,
+        624
+      ],
+      "typeVersion": 1,
+      "id": "ef266e5b-23d4-47ee-afee-aca3ec47fd36",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Memory\n**采用 Simple Meomory 不需要过多配置**",
+        "height": 256,
+        "width": 560,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -560,
+        624
+      ],
+      "typeVersion": 1,
+      "id": "d318e24d-9afa-4e48-8147-09e7c79ef2ef",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        736
+      ],
+      "id": "b8b067c9-6bd5-44cb-9dc9-ac1f65611cc4",
+      "name": "DeepSeek Chat Model",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "DBJPT7TK5viXRgce",
+          "name": "DeepSeek account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "responseNodes"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -832,
+        -32
+      ],
+      "id": "9f59d561-0fb3-4f6c-9161-7fee68377cce",
+      "name": "对话框输入",
+      "webhookId": "985a0f97-9657-4ee9-bc51-e935c10c5afc"
+    },
+    {
+      "parameters": {
+        "message": "={{ $json.result }}",
+        "waitUserReply": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        432
+      ],
+      "id": "8a6a5c51-70a3-43af-adfc-93da661a986a",
+      "name": "对话框输出"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7e7643b6-3b1c-424e-8cd6-04a4985b526c",
+              "leftValue": "={{ $json.shouldContinue }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "e4521c85-14b2-4115-ae8e-f024304ad84a",
+              "leftValue": "={{ $json.time }}",
+              "rightValue": "3",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -832,
+        448
+      ],
+      "id": "6d2d1e26-7302-4212-9541-39b1736b5576",
+      "name": "判断"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=对以下的调查结果总结\n\n- 重要的洞察、结论和剩余的不确定性。\n- 适当引用来源。\n- 该总结应非常全面和详细，预计为长文。\n- 请以json格式输出, 如下例:\n\n{result: str | None}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -656,
+        432
+      ],
+      "id": "54e2b966-7a0d-4651-9523-9a0e16631e2c",
+      "name": "研究总结"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Tavily": {
+      "main": [
+        [
+          {
+            "node": "优化回答和逻辑规划",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "初步回答和继续规划": {
+      "main": [
+        [
+          {
+            "node": "提取1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "优化回答和逻辑规划": {
+      "main": [
+        [
+          {
+            "node": "提取2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "初步回答和继续规划",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "优化回答和逻辑规划",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "研究总结",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "提取1": {
+      "main": [
+        [
+          {
+            "node": "Tavily",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "提取2": {
+      "main": [
+        [
+          {
+            "node": "判断",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "提取3": {
+      "main": [
+        [
+          {
+            "node": "对话框输出",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "研究总结",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "优化回答和逻辑规划",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "初步回答和继续规划",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "对话框输入": {
+      "main": [
+        [
+          {
+            "node": "初步回答和继续规划",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "对话框输出": {
+      "main": [
+        []
+      ]
+    },
+    "判断": {
+      "main": [
+        [
+          {
+            "node": "研究总结",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tavily",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "研究总结": {
+      "main": [
+        [
+          {
+            "node": "提取3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1fe52a4e-5d6e-4125-a8f8-be706e1e1d61",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "624a8d4c5f39845d1a3086bcd63c74899f8de214e4c226662c23e2190750bc27"
+  },
+  "id": "GHOHn0LRp0cozCaM",
+  "tags": []
+}
